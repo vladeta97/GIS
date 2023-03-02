@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+    integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+    crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+    integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+    crossorigin=""></script>
+  <script type="text/javascript" src="https://code.jquery.com/jquery-1.7.1.min.js"></script>
+  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/1.4.0/proj4.js"></script>
+  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/rxjs/8.0.0-alpha.0/rxjs.umd.js"></script>
+  <style>
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+    }
+
+    .leaflet-container {
+      height: 840px;
+      width: 1400px;
+      max-width: 100%;
+      max-height: 100%;
+    }
+
+    .insert-container {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      background-color: aliceblue;
+      z-index: 400;
+      padding: 0.3em;
+    }
+  </style>
+</head>
+
+<body>
+  <div style="display: flex">
+    <div id="map"></div>
+  <div style="border-style: groove; margin-left: 7px;">    
+        <div style="border-style: outset; margin-top: 5px; margin-bottom: 5px;">
+            <div style="padding: 5pt;">
+              Visina vrhova:
+            <input type="number" id="filterInputFrom" placeholder="Filter..." style="width: 50px;"/>
+            do
+            <input type="numer" id="filterInputTo" placeholder="Filter..." style="width: 50px;"/>
+            <button onclick="filterPeaks()" style="width: 150px; margin-left: 5px;">Filtriraj</button>
+            <button onclick="clearPeaksFilter()" style="margin-left: 15;">X</button>
+            </div>
+        </div>
+        <div style="border-style: outset; margin-top: 15px; margin-bottom: 15px; padding: 5px;">
+          Unos gpx fajlova
+			<form enctype = "multipart/form-data" onsubmit="return false;" style="margin-top: 5px;" >
+        <input type="button" id="loadFileGpx" value="Odaberite fjal" onclick="document.getElementById('file').click();" />
+        <input type="file" style="display:none;" id="file" name="static_file"/>
+				<button id="upload-button" onclick="uploadFile(this.form)"> Zapamti fajl </button>
+			</form>
+			</div>
+       <div style="border-style: outset; margin-top: 15px; margin-bottom: 15px; padding: 5px;">
+       Detalji staze:
+       </div>
+      </div> 
+			
+			
+ <div id="static_file_response"> </div>
+			
+    </div>
+  </div>
+  </div>
+  <script src="hikingjs.js">
+    
+  </script>
+</body>
+
+</html>
