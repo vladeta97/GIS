@@ -10,17 +10,12 @@
       polygon: 'gis_test:planet_osm_polygon',
       polygon4326: 'gis_test:planet_osm_polygon_new',
       line: 'gis_test:planet_osm_line_new',
-      pointLine: 'serbia:SerbiaMap',
-	  tracks:'gis_test:tracks',
-    track_points:'gis_test:track_points',
-	  trek_start:'gis_test:start_point'
+	    tracks:'gis_test:tracks',
+      track_points:'gis_test:track_points',
+	    trek_start:'gis_test:start_point'
     }
 	
     const icons = {
-      policijskaStanica: L.icon({
-            iconUrl: 'police-station.png',
-            iconSize: [35, 35]
-      }),
       start: L.icon({
         iconUrl: 'start.png',
         iconSize: [30, 30]
