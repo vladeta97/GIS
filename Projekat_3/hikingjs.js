@@ -40,6 +40,9 @@
       water_source: L.icon({
         iconUrl: 'wsource.png',
         iconSize: [30, 30]
+      }),spring: L.icon({
+        iconUrl: 'spring.png',
+        iconSize: [30, 30]
       }),
       viewpoint: L.icon({
         iconUrl: 'viewpoint.png',
@@ -55,14 +58,26 @@
     var isInsertMode = false;
     var pointClickedEvent = null;
     var polylines = [];
+    var markers=[];
+    var gDArray=[];
+    var posOnGraphMarker;
     var isLineShown=false;
     let ms;
     let gp;
 
     addControls();
 
+    function graphData(xvalue,yvalue,latlng){
+      this.xvalue=xvalue;
+      this.yvalue=yvalue;
+      this.latlng=latlng;
+    }
+
     createCavesLayer().then(a => {
       layerControls.addOverlay(cave, 'Pecine');
+    })
+    createSpringsLayer().then(a => {
+      layerControls.addOverlay(spring, 'Izvor');
     })
     createPeakLayer().then(a => {
       layerControls.addOverlay(peak, 'Vrhovi');
@@ -81,6 +96,14 @@
     })
 
     function onMapClicked(e) {
+      if(polylines!=null){
+        x=polylines.pop();
+        map.removeLayer(x);
+      }
+      if(posOnGraphMarker!=null){
+        map.removeLayer(posOnGraphMarker);
+        posOnGraphMarker=null;
+      }
       if (isInsertMode) {
         pointClickedEvent = e;
         addCurrLocMarker(e);
@@ -187,6 +210,21 @@
       });
     }
 
+    function createSpringsLayer() {
+      return new Promise((resolve, reject) => {
+        let url = `${serverBaseUrl}/wfs?service=wfs&version=1.1.0&request=GetFeature&typename=${layer.point4326}&outputformat=json&cql_filter=natural='spring'&CRS=EPSG:4326`;
+        callApiAndSetLayer(url, null, function (data) {
+          if (data && data.features) {
+            var uni = data.features.map(feature =>
+              markFeature([feature.geometry.coordinates[1], feature.geometry.coordinates[0]], feature.properties.name,  'spring')
+            );
+            spring = L.layerGroup(uni);
+            resolve();
+          }
+        }, 'spring')
+      });
+    }
+
     function createPeakLayer() {
       return new Promise((resolve, reject) => {
         let peakUrl = `${serverBaseUrl}/wfs?service=wfs&version=1.1.0&request=GetFeature&typename=${layer.point4326}&outputformat=json&cql_filter=natural='peak'and ele between 1500 and 2500&CRS=EPSG:4326`;
@@ -209,20 +247,37 @@
           if (data && data.features) {
             var uni = data.features.map(feature =>
               markTrek([feature.geometry.coordinates[1], feature.geometry.coordinates[0]], feature.properties.name)
+              
             );
             start = L.layerGroup(uni);
             resolve();
           }
         }, 'start')
+        console.log(markers);
       });
     }
     
     
-    function createPathLayer(){
+    function createPathLayer(e){
+      console.log(e.latlng);
+      for(var i=0;i<markers.length;i++){
+        //console.log(markers[i][0]);
+        if(markers[i][0]._latlng==e.latlng){
+          var msg=markers[i][1];
+          drawPath(msg)
+          console.log('aaaaaa' + msg);
+        }
+      } 
+    }
+
+    function drawPath(msg){
+      if(polylines.length!=0){
+        x=polylines.pop();
+        map.removeLayer(x);
+      }
       return new Promise((resolve, reject) => {
-        let url;
         console.log(ms);
-        url = `${serverBaseUrl}/wfs?service=wfs&version=1.1.0&request=GetFeature&typename=${layer.tracks}&outputformat=json&cql_filter=name='${ms}'&CRS=EPSG:4326`;
+        let url = `${serverBaseUrl}/wfs?service=wfs&version=1.1.0&request=GetFeature&typename=${layer.tracks}&outputformat=json&cql_filter=name='${msg}'&CRS=EPSG:4326`;
         var tmp=null;
         $.ajax({
           'async': false,
@@ -233,11 +288,12 @@
               tmp=data
            }
         });
-        console.log(tmp.features[0])
+       // console.log(tmp.features[0])
         src=tmp.features[0].properties.src;
         n=tmp.features[0].properties.name;
         pointList=tmp.features[0].geometry.coordinates[0];
-        swapCords=pointList.forEach(swap);
+        pointList.forEach(swap);
+        console.log(tmp.features);
         var firstpolyline = new L.polyline(pointList, {
             color: 'red',
             weight: 3,
@@ -246,7 +302,7 @@
         map.fitBounds(firstpolyline.getBounds());
         firstpolyline.addTo(map);
         polylines.push(firstpolyline);
-        console.log(src +' '+ n);
+        //console.log(src +' '+ n);
         createGraph(src);
       });
     }
@@ -260,8 +316,8 @@
     function createGraph(src){
       return new Promise((resolve, reject) => {
         let url;
-        console.log('x3');
-        console.log(src);
+        //console.log('x3');
+        //console.log(src);
         url = `${serverBaseUrl}/wfs?service=wfs&version=1.1.0&request=GetFeature&typename=${layer.track_points}&outputformat=json&cql_filter=src='${src}'&CRS=EPSG:4326`;
         var tmp=null;
         $.ajax({
@@ -273,7 +329,7 @@
               tmp=data
            }
         });
-        console.log(tmp);
+        //console.log(tmp);
         //drawGraph(tmp);
         formGraphData(tmp);
 
@@ -283,16 +339,36 @@
     function formGraphData(data){
     var xValues=[];
     var yValues=[];
-    for(let i=0;i<data.totalFeatures;i+=50){
-      xValues[i]=i;
-      yValues[i]=data.features[i].properties.ele;
-      console.log(yValues[i]);
+    count=0;
+    count2=0;
+    //console.log(data);
+    var startPointLon=data.features[0].geometry.coordinates[0];
+    var startPointLat=data.features[0].geometry.coordinates[1];
+    gDArray=[]
+
+    for(let i=0;i<data.totalFeatures;i+=10){
+
+      var a=getDistanceFromLatLonInKm(startPointLat,startPointLon,data.features[i].geometry.coordinates[1],data.features[i].geometry.coordinates[0]);
+      var x=Math.round(a*100)/100;
+      startPointLat=data.features[i].geometry.coordinates[1];
+      startPointLon=data.features[i].geometry.coordinates[0];
+      count2+=x;
+      
+      xValues[count]=count2.toFixed(1);
+      yValues[count]=data.features[i].properties.ele;
+      
+      gDArray.push({x:xValues[count],y:yValues[count],latlng:[data.features[i].geometry.coordinates[1],data.features[i].geometry.coordinates[0]]});
+      count++;
     }
+    //console.log(gDArray);
+    //console.log(yValues);
     drawGraph(xValues,yValues);
+
     }
 
     function drawGraph(xV,yV){
       var xValues =xV;
+    
       var yValues = yV;
       
       new Chart("myChart", {
@@ -300,19 +376,28 @@
         data: {
           labels: xValues,
           datasets: [{
+            data: yValues,
             fill: false,
-            lineTension: 0,
-            backgroundColor: "rgba(0,0,255,1.0)",
-            borderColor: "rgba(0,0,255,0.1)",
-            data: yValues
+            borderColor: "red"
           }]
         },
         options: {
           legend: {display: false},
-          scales: {
-            yAxes: [{ticks: {min: 6, max:16}}],
+          onClick: (event, elements, chart) => {
+            console.log(elements[0]._index);
+            console.log(gDArray[elements[0]._index]);
+            console.log('aaaaa')
+
+            if(posOnGraphMarker!=null){
+              console.log('bbbb')
+              map.removeLayer(posOnGraphMarker);
+            }
+            let msg="Distance: "+ gDArray[elements[0]._index].x +"km"+ "\n"+"Elevation: "+ gDArray[elements[0]._index].y+"m";
+            posOnGraphMarker = L.marker(gDArray[elements[0]._index].latlng).bindPopup(msg).openPopup();
+            map.addLayer(posOnGraphMarker);
           }
         }
+
       });
     }
 
@@ -320,6 +405,8 @@
       let ico = icons.start;
       ms=message;
       var marker = L.marker(latlng, { icon: ico}).bindPopup(message).openPopup().on('click', createPathLayer);
+      mark=[marker,message]
+      markers.push(mark);
       return marker;
     }
 
@@ -456,6 +543,8 @@
         ico = icons.peak;
       }else if (type == 'cave'){
         ico = icons.cave;  
+      }else if (type == 'spring'){
+        ico = icons.spring;  
       }else if (type == 'peak'){
         ico = icons.peak;  
       }else if (type == 'start'){
@@ -473,29 +562,35 @@
       return marker;
     }
 
-    function circlePopup(latlng, name, population) {
-      var radius = population / 50;
-      var circle = L.circle(latlng, {
-        color: 'red',
-        fillColor: 'red',
-        fillOpacity: 0.5,
-        radius: radius
-      });
-      circle.bindPopup(`City: ${name}<br>Population: ${population}`).openPopup()
-      return circle;
+    function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
+      var R = 6371; // Radius of the earth in km
+      var dLat = deg2rad(lat2-lat1);  // deg2rad below
+      var dLon = deg2rad(lon2-lon1); 
+      var a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+        Math.sin(dLon/2) * Math.sin(dLon/2)
+        ; 
+      var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+      var d = R * c; // Distance in km
+      return d;
+    }
+    
+    function deg2rad(deg) {
+      return deg * (Math.PI/180)
     }
 		
-	function uploadFile(form){
-	  const formData = new FormData(form);
-	  var oReq = new XMLHttpRequest();
-		oReq.open("POST", "http://127.0.0.1:5000/upload_file", true);
-	  oReq.onload = function(oEvent) {
-      if (oReq.status == 200) {
-        console.log(oReq.response)
-      } else {
-        console.log("error while uploading");
-      }
-		};
-	  console.log("Sending file!")
-	  oReq.send(formData);
-	}
+    function uploadFile(form){
+      const formData = new FormData(form);
+      var oReq = new XMLHttpRequest();
+      oReq.open("POST", "http://127.0.0.1:5000/upload_file", true);
+      oReq.onload = function(oEvent) {
+        if (oReq.status == 200) {
+          console.log(oReq.response)
+        } else {
+          console.log("error while uploading");
+        }
+      };
+      console.log("Sending file!")
+      oReq.send(formData);
+    }
