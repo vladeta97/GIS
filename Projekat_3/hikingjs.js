@@ -2,19 +2,6 @@
     const mapTilerAttribution = '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>';
     const serverBaseUrl = 'http://localhost:8080/geoserver/gis_test';
 	
-    const layer = {
-      point: 'gis_test:planet_osm_point',
-      point4326: 'gis_test:planet_osm_point_new',
-      datapoint: 'gis_test:avl',
-      roads: 'gis_test:planet_osm_roads_new',
-      polygon: 'gis_test:planet_osm_polygon',
-      polygon4326: 'gis_test:planet_osm_polygon_new',
-      line: 'gis_test:planet_osm_line_new',
-	    tracks:'gis_test:tracks',
-      track_points:'gis_test:track_points',
-	    trek_start:'gis_test:start_point'
-    }
-	
     const icons = {
       start: L.icon({
         iconUrl: 'start.png',
@@ -37,13 +24,26 @@
         iconSize: [30, 30]
       }),spring: L.icon({
         iconUrl: 'spring.png',
-        iconSize: [30, 30]
+        iconSize: [20, 20]
       }),
       viewpoint: L.icon({
         iconUrl: 'viewpoint.png',
         iconSize: [30, 30]
       })
     };
+
+    const layer = {
+      point: 'gis_test:planet_osm_point',
+      point4326: 'gis_test:planet_osm_point_new',
+      datapoint: 'gis_test:avl',
+      roads: 'gis_test:planet_osm_roads_new',
+      polygon: 'gis_test:planet_osm_polygon',
+      polygon4326: 'gis_test:planet_osm_polygon_new',
+      line: 'gis_test:planet_osm_line_new',
+	    tracks:'gis_test:tracks',
+	    track_points:'gis_test:track_points',
+	    trek_start:'gis_test:start_point'
+    }
 	
     var map = initMap();
 
@@ -51,31 +51,36 @@
     var layerControls;
 
     var isInsertMode = false;
+    var calculateDistance=false;
     var pointClickedEvent = null;
     var polylines = [];
+    var distancelines=[];
     var markers=[];
     var gDArray=[];
+    var distancArray=[];
     var posOnGraphMarker;
     var isLineShown=false;
     let ms;
     let gp;
+    var myChr;
 
     addControls();
-
-    function graphData(xvalue,yvalue,latlng){
-      this.xvalue=xvalue;
-      this.yvalue=yvalue;
-      this.latlng=latlng;
-    }
 
     createCavesLayer().then(a => {
       layerControls.addOverlay(cave, 'Pecine');
     })
-    createSpringsLayer().then(a => {
-      layerControls.addOverlay(spring, 'Izvor');
+    createAlpineHutLayer().then(a => {
+      layerControls.addOverlay(hut, 'Planinarski dom');
+    })
+
+    createNationalParkLayer().then(a => {
+      layerControls.addOverlay(park, 'Park');
     })
     createPeakLayer().then(a => {
-      layerControls.addOverlay(peak, 'Vrhovi');
+      layerControls.addOverlay(peak, 'Vrhovi u nacionalnim parkovima');
+    })
+    createTracksNationalParks().then(a => {
+      layerControls.addOverlay(voda, 'Staze u nacionalnim parkovima');
     })
     createTrekLayer().then(a => {
       layerControls.addOverlay(start, 'Trek');
@@ -90,21 +95,105 @@
       layerControls.addOverlay(viewpoint, 'Vidikovac');
     })
 
+    function graphData(xvalue,yvalue,latlng){
+      this.xvalue=xvalue;
+      this.yvalue=yvalue;
+      this.latlng=latlng;
+    }
+
     function onMapClicked(e) {
-      if(polylines!=null){
-        x=polylines.pop();
-        map.removeLayer(x);
-      }
-      if(posOnGraphMarker!=null){
-        map.removeLayer(posOnGraphMarker);
-        posOnGraphMarker=null;
-      }
+     
       if (isInsertMode) {
         pointClickedEvent = e;
         addCurrLocMarker(e);
       } else {
         getFeatureInfo(e);
       }
+
+      if(calculateDistance){
+        pointClickedEvent = e;
+        distancArray.push(e)
+        if(distancArray.length==2){
+          distanceBetweenPoints();
+        }
+        addCurrLocMarker(e);
+      } else {
+        getFeatureInfo(e);
+      }
+
+      if(distancArray.length>2){
+        x=distancelines.pop();
+        console.log("aaaabbb");
+        console.log(distancelines);
+        map.removeLayer(x);
+      }
+
+	   if(polylines.length>0){
+        x=polylines.pop();
+        map.removeLayer(x);
+       
+        if(myChr!=null){
+          myChr.destroy();
+        }
+       
+      }
+	    else{
+		  console.log("CLICK");
+	     }
+	    if(posOnGraphMarker!=null){
+        map.removeLayer(posOnGraphMarker);
+        posOnGraphMarker=null;
+      }
+      if(calculateDistance==false && distancArray.length>0){
+        b=distancArray.pop();
+        map.removeLayer(b);
+        console.log(distancArray);
+      }
+      
+    }
+
+    function findDistance(){
+      calculateDistance=true;
+    }
+
+    function disableDistance(){
+      console.log("disable distance");
+      calculateDistance=false;
+      if(distancArray.length>1){
+        b=distancArray.pop()
+        map.removeLayer(b);
+        //distancArray=[]; 
+      }
+    }
+
+    function distanceBetweenPoints(){
+      if(calculateDistance){
+        var point1=distancArray[0].latlng;
+        var point2=distancArray[1].latlng;
+        drawLine(point1,point2);
+        x=getDistanceFromLatLonInKm(point1.lat,point1.lng,point2.lat,point2.lng);
+        console.log(x);
+        x=Math.round(x*100)/100;
+        var dist = document.getElementById('distance');
+        dist.innerHTML=x+"km";
+        console.log(distancArray);
+      }
+      
+    }
+
+    function drawLine(point1,point2){
+      var pointlist=[point1,point2];
+      //pointlist.forEach(swap);
+      console.log("drawLine");
+      var line = new L.polyline(pointlist, {
+        color: 'red',
+        weight: 3,
+        opacity: 0.5
+    });
+    console.log(pointlist);
+    map.fitBounds(line.getBounds());
+    line.addTo(map);
+    distancelines.push(line);
     }
 
     function addCurrLocMarker(e){
@@ -139,7 +228,7 @@
     function initMap() {
       let map = L.map('map')
         .setView([44, 21], 7);
-      L.tileLayer('https://api.maptiler.com/maps/basic/{z}/{x}/{y}.png?key=5l7zynRL91qC3yKajzKP', {
+        L.tileLayer('https://api.maptiler.com/maps/basic/{z}/{x}/{y}.png?key=5l7zynRL91qC3yKajzKP', {
         attribution: '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>',
         maxZoom: 18,
         id: 'mapbox/streets-v11',
@@ -155,21 +244,6 @@
       var basemaps = {
         Lokacije: L.tileLayer.wms(serverBaseUrl + '/wms', {
           layers: layer.point,
-          format: 'image/png',
-          transparent: true
-        }),
-        Linije: L.tileLayer.wms(serverBaseUrl + '/wms', {
-          layers: layer.line,
-          format: 'image/png',
-          transparent: true
-        }),
-        Putevi: L.tileLayer.wms(serverBaseUrl + '/wms', {
-          layers: layer.roads,
-          format: 'image/png',
-          transparent: true
-        }),
-        Oblasti: L.tileLayer.wms(serverBaseUrl + '/wms', {
-          layers: layer.polygon,
           format: 'image/png',
           transparent: true
         }),
@@ -205,24 +279,52 @@
       });
     }
 
-    function createSpringsLayer() {
+    function createAlpineHutLayer() {
       return new Promise((resolve, reject) => {
-        let url = `${serverBaseUrl}/wfs?service=wfs&version=1.1.0&request=GetFeature&typename=${layer.point4326}&outputformat=json&cql_filter=natural='spring'&CRS=EPSG:4326`;
+        let url = `${serverBaseUrl}/wfs?service=wfs&version=1.1.0&request=GetFeature&typename=${layer.polygon4326}&outputformat=json&cql_filter=tourism='alpine_hut'&CRS=EPSG:4326`;
         callApiAndSetLayer(url, null, function (data) {
           if (data && data.features) {
             var uni = data.features.map(feature =>
-              markFeature([feature.geometry.coordinates[1], feature.geometry.coordinates[0]], feature.properties.name,  'spring')
+              L.marker([feature.geometry.coordinates[0][0][1], feature.geometry.coordinates[0][0][0]]).bindPopup('Naziv: '+feature.properties.name+'\n'+"\nKontakt: "+feature.properties.operator).openPopup()
             );
-            spring = L.layerGroup(uni);
+            hut = L.layerGroup(uni);
             resolve();
           }
-        }, 'spring')
+        }, 'hut')
+      });
+    } 
+
+    function createNationalParkLayer() {
+      return new Promise((resolve, reject) => {
+        let url = `${serverBaseUrl}/wfs?service=wfs&version=1.1.0&request=GetFeature&typename=${layer.polygon4326}&outputformat=json&cql_filter=boundary in ('national_park', 'protected_area')&CRS=EPSG:4326`;
+        var tmp=null;
+        $.ajax({
+          'async': false,
+          'url': url,
+          'dataType': "json",
+          'type': "GET",
+           success: function (data) {
+              tmp=data;
+              var layer=tmp.features.forEach(element => {
+                element.geometry.coordinates.forEach(cord=>{
+                  cord.forEach(swap);
+                   layer = new L.polyline(cord, {
+                    color: 'green',
+                    weight: 2,
+                    opacity: 0.3
+                });
+                layer.addTo(map);
+                });
+              });
+           }
+        });
+        console.log(tmp.features[0]);
       });
     }
 
     function createPeakLayer() {
       return new Promise((resolve, reject) => {
-        let peakUrl = `${serverBaseUrl}/wfs?service=wfs&version=1.1.0&request=GetFeature&typename=${layer.point4326}&outputformat=json&cql_filter=natural='peak'and ele between 1500 and 2500&CRS=EPSG:4326`;
+        let peakUrl = `${serverBaseUrl}/wfs?service=wfs&version=1.1.0&request=GetFeature&typename=${layer.point4326}&outputformat=json&cql_filter=natural='peak'%20AND%20WITHIN(way,collectGeometries(queryCollection('gis_test:planet_osm_polygon_new','way','boundary=''national_park''')))&CRS=EPSG:4326`;
         callApiAndSetLayer(peakUrl, null, function (data) {
           if (data && data.features) {
             var c = data.features.map(feature =>
@@ -248,7 +350,6 @@
             resolve();
           }
         }, 'start')
-        console.log(markers);
       });
     }
     
@@ -256,7 +357,6 @@
     function createPathLayer(e){
       console.log(e.latlng);
       for(var i=0;i<markers.length;i++){
-        //console.log(markers[i][0]);
         if(markers[i][0]._latlng==e.latlng){
           var msg=markers[i][1];
           drawPath(msg)
@@ -283,21 +383,19 @@
               tmp=data
            }
         });
-       // console.log(tmp.features[0])
         src=tmp.features[0].properties.src;
         n=tmp.features[0].properties.name;
         pointList=tmp.features[0].geometry.coordinates[0];
         pointList.forEach(swap);
         console.log(tmp.features);
         var firstpolyline = new L.polyline(pointList, {
-            color: 'red',
-            weight: 3,
-            opacity: 0.5
+            color: 'blue',
+            weight: 4,
+            opacity: 0.4
         });
         map.fitBounds(firstpolyline.getBounds());
         firstpolyline.addTo(map);
         polylines.push(firstpolyline);
-        //console.log(src +' '+ n);
         createGraph(src);
       });
     }
@@ -308,11 +406,9 @@
       data[1]=x;
     }
     
-    function createGraph(src){
+    function createGraph(src){  
       return new Promise((resolve, reject) => {
         let url;
-        //console.log('x3');
-        //console.log(src);
         url = `${serverBaseUrl}/wfs?service=wfs&version=1.1.0&request=GetFeature&typename=${layer.track_points}&outputformat=json&cql_filter=src='${src}'&CRS=EPSG:4326`;
         var tmp=null;
         $.ajax({
@@ -324,10 +420,7 @@
               tmp=data
            }
         });
-        //console.log(tmp);
-        //drawGraph(tmp);
         formGraphData(tmp);
-
       });
     }
 
@@ -336,37 +429,37 @@
     var yValues=[];
     count=0;
     count2=0;
-    //console.log(data);
     var startPointLon=data.features[0].geometry.coordinates[0];
     var startPointLat=data.features[0].geometry.coordinates[1];
     gDArray=[]
 
     for(let i=0;i<data.totalFeatures;i+=10){
-
       var a=getDistanceFromLatLonInKm(startPointLat,startPointLon,data.features[i].geometry.coordinates[1],data.features[i].geometry.coordinates[0]);
       var x=Math.round(a*100)/100;
       startPointLat=data.features[i].geometry.coordinates[1];
       startPointLon=data.features[i].geometry.coordinates[0];
       count2+=x;
-      
+  
       xValues[count]=count2.toFixed(1);
       yValues[count]=data.features[i].properties.ele;
       
       gDArray.push({x:xValues[count],y:yValues[count],latlng:[data.features[i].geometry.coordinates[1],data.features[i].geometry.coordinates[0]]});
       count++;
     }
-    //console.log(gDArray);
-    //console.log(yValues);
     drawGraph(xValues,yValues);
-
     }
 
     function drawGraph(xV,yV){
+     
       var xValues =xV;
     
       var yValues = yV;
+      if(myChr!=null){
+        console.log("ggggg");
+        myChr.destroy();
+      }
       
-      new Chart("myChart", {
+      myChr=new Chart("myChart", {
         type: "line",
         data: {
           labels: xValues,
@@ -392,7 +485,6 @@
             map.addLayer(posOnGraphMarker);
           }
         }
-
       });
     }
 
@@ -421,7 +513,7 @@
     }
     function createWaterSourceLayer() {
       return new Promise((resolve, reject) => {
-        let url = `${serverBaseUrl}/wfs?service=wfs&version=1.1.0&request=GetFeature&typename=${layer.point4326}&outputformat=json&cql_filter=amenity='drinking_water'&CRS=EPSG:4326`;
+        let url = `${serverBaseUrl}/wfs?service=wfs&version=1.1.0&request=GetFeature&typename=${layer.point4326}&outputformat=json&cql_filter=amenity='drinking_water' OR waterway='source' OR natural='spring'&CRS=EPSG:4326`;
         callApiAndSetLayer(url, null, function (data) {
           if (data && data.features) {
             var w = data.features.map(feature =>
@@ -457,14 +549,13 @@
       }else{
         createPeakFilterLayer(valueFrom,valueTo);
       }
-
     }
    
     function createPeakFilterLayer(valueFrom,valueTo) {
        return new Promise((resolve, reject) => {
          let url;
          url = `${serverBaseUrl}/wfs?service=wfs&version=1.1.0&request=GetFeature&typename=${layer.point4326}&outputformat=json&cql_filter=natural='peak' and ele between '${valueFrom}' and '${valueTo}'&CRS=EPSG:4326`;
-         let t = type;
+         console.log(url);
          callApiAndSetLayer(url, null, function (data, latlng, tt) {
            if (data && data.features) {
             console.log('x4');
@@ -474,7 +565,7 @@
              var flag = false;
              filtered_peaks = L.layerGroup(uni);
              if(flag == true){
-              console.log('x6');
+              //console.log('x6');
                map.eachLayer((layer) => {
                  if(layer['_latlng']!=undefined)
                  layer.remove();
@@ -488,6 +579,132 @@
          }, 'filtered_peaks')
        });
      }
+
+    function filterTreksRegion(){
+      let value;
+      if(document.getElementById('myRadio1').checked){
+        value=document.getElementById('myRadio1').value;
+      }else if(document.getElementById('myRadio2').checked){
+        value=document.getElementById('myRadio2').value;
+      }else if(document.getElementById('myRadio3').checked){
+        value=document.getElementById('myRadio3').value;
+      }else if(document.getElementById('myRadio4').checked){
+        value=document.getElementById('myRadio4').value;
+      }else if(document.getElementById('myRadio5').checked){
+        value=document.getElementById('myRadio5').value;
+      }else if(document.getElementById('myRadio6').checked){
+        value=document.getElementById('myRadio6').value;
+      }else if(document.getElementById('myRadio7').checked){
+        value=document.getElementById('myRadio7').value;
+      }else if(document.getElementById('myRadio8').checked){
+        value=document.getElementById('myRadio8').value;
+      }
+      let url = `${serverBaseUrl}/wfs?service=wfs&version=1.1.0&request=GetFeature&typename=${layer.trek_start}&outputformat=json&cql_filter=WITHIN(geom,collectGeometries(queryCollection('gis_test:planet_osm_polygon_new','way','name=''${value}''')))&CRS=EPSG:4326`;
+      filterRegion(url);
+      console.log(url);
+    }
+
+    function filterRegion(url){
+      return new Promise((resolve, reject) => {
+        callApiAndSetLayer(url, null, function (data, latlng, tt) {
+          if (data && data.features) {
+          console.log('x4');
+            var uni = data.features.map(feature =>              
+              markTrek([feature.geometry.coordinates[1], feature.geometry.coordinates[0]],feature.properties.name)          
+            );
+            var flag = false;
+            filtered_treks = L.layerGroup(uni);
+            if(flag == true){
+            console.log('x6');
+              map.eachLayer((layer) => {
+                if(layer['_latlng']!=undefined)
+                layer.remove();
+              })
+              filtered_treks.addTo(map);
+            }
+            console.log('x7');
+            layerControls.addOverlay(filtered_treks, 'Odabrani trekovi');
+            resolve(filtered_treks);
+          }
+        }, 'filtered_treks')
+      });
+    }
+
+    function clearTrekRegion(){
+      map.removeLayer(filtered_treks)
+      layerControls.removeLayer(filtered_treks);
+      layerControls._update();
+    }
+
+    function filterTrekDate(){
+      var startDate = document.getElementById('startDatum').value;
+      var endDate = document.getElementById('krajDatum').value;
+      var startTime = "00:00";
+      var endTime = "00:00";
+      const startDateTime = new Date(startDate + ' ' + startTime);
+      const endDateTime = new Date(endDate + ' ' + endTime);
+
+      var sDT = startDateTime.toISOString();
+      var eDT = endDateTime.toISOString();
+      console.log(sDT);
+      console.log(eDT);
+      let url = `${serverBaseUrl}/wfs?service=wfs&version=1.1.0&request=GetFeature&typename=${layer.trek_start}&outputformat=json&cql_filter=dtime%20AFTER%20${sDT}%20and%20dtime%20BEFORE%20${eDT}&CRS=EPSG:4326`;
+      console.log(url);
+      createfilterDateLayer(url);
+      //let cityUrl = `${serverBaseUrl}/wfs?service=wfs&version=1.1.0&request=GetFeature&typename=${layer.trek_start}&outputformat=json&cql_filter=amenity in ('school', 'driving_school', 'language_school') AND dwithin(way, collectGeometries(queryCollection('serbia:planet_osm_datapoint', 'way', 'speed > 45 and speed < 220 and dtime AFTER ${sDT} and dtime BEFORE ${eDT}')), 200, meters)&CRS=EPSG:4326`;        
+    }
+
+    function createfilterDateLayer(url){
+      return new Promise((resolve, reject) => {
+        callApiAndSetLayer(url, null, function (data, latlng, tt) {
+          if (data && data.features) {
+          console.log('x4');
+            var uni = data.features.map(feature =>              
+              markTrek([feature.geometry.coordinates[1], feature.geometry.coordinates[0]],feature.properties.name)          
+            );
+            var flag = false;
+            filtered_treks_date = L.layerGroup(uni);
+            if(flag == true){
+            console.log('x6');
+              map.eachLayer((layer) => {
+                if(layer['_latlng']!=undefined)
+                layer.remove();
+              })
+              filtered_treks_date.addTo(map);
+            }
+            console.log('x7');
+            layerControls.addOverlay(filtered_treks_date, 'Odabrani trekovi');
+            resolve(filtered_treks_date);
+          }
+        }, 'filtered_treks_date')
+      });
+    }
+
+    function clearTrekDate(){
+      map.removeLayer(filtered_treks_date)
+      layerControls.removeLayer(filtered_treks_date);
+      layerControls._update();
+    }
+
+    
+     function createTracksNationalParks() {
+        return new Promise((resolve, reject) => {
+          console.log('aaaaaa');    
+          let url = `${serverBaseUrl}/wfs?service=wfs&version=1.1.0&request=GetFeature&typename=${layer.trek_start}&outputformat=json&cql_filter=WITHIN(geom,collectGeometries(queryCollection('gis_test:planet_osm_polygon_new','way','boundary=''national_park''')))&CRS=EPSG:4326`;//boundary in ('national_park', 'protected_area')
+          console.log(url);
+          callApiAndSetLayer(url, null, function (data) {
+            console.log(data);
+            if (data && data.features) {
+              var w = data.features.map(feature =>
+                markTrek([feature.geometry.coordinates[1], feature.geometry.coordinates[0]],feature.properties.name)
+              );
+              voda = L.layerGroup(w);
+              resolve();
+            }
+          }, 'voda')});
+      }
+
+
 
      function clearPeaksFilter(){
       map.removeLayer(filtered_peaks)
@@ -538,8 +755,6 @@
         ico = icons.peak;
       }else if (type == 'cave'){
         ico = icons.cave;  
-      }else if (type == 'spring'){
-        ico = icons.spring;  
       }else if (type == 'peak'){
         ico = icons.peak;  
       }else if (type == 'start'){
@@ -547,10 +762,16 @@
       }else if (type == 'waterfall'){
         ico = icons.waterfall;  
       }else if (type == 'drinking_water'){
-        ico = icons.water_source;  
+        ico = icons.spring;  
       }else if (type == 'viewpoint'){
         ico = icons.viewpoint;  
       }else if (type == 'filtered_treks'){
+        ico = icons.start;  
+      }else if(type=='filtered_treks_date'){
+        ico = icons.start;
+      }else if (type == 'park'){
+        ico = icons.cave;  
+      }else if (type == 'hut'){
         ico = icons.viewpoint;  
       }
       var marker = L.marker(latlng, { icon: ico}).bindPopup(message).openPopup()

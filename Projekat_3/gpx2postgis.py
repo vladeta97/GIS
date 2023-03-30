@@ -103,9 +103,9 @@ def addFirstPointToDB(gpxfile):
     print(gpx)
     track=gpx.tracks[0]
     point=track.segments[0].points[0]
-    print(point)
+    print(gpx.time)
     #point=gpx.tracks[0].segments[0].points[0]
-    cur.execute("INSERT INTO start_point (name, src, lon,lat,elevation) VALUES (%s, %s, %s,%s,%s)", (track.name,gpxfile,point.longitude, point.latitude, point.elevation))
+    cur.execute("INSERT INTO start_point (name, src, lon,lat,elevation,dtime) VALUES (%s, %s, %s,%s,%s,%s)", (track.name,gpxfile,point.longitude, point.latitude, point.elevation,gpx.time))
     conn.commit()
     cur.execute("UPDATE start_point SET geom = ST_SetSRID(ST_MakePoint(lon, lat), 4326)")
     conn.commit()

@@ -40,8 +40,30 @@
 
 <body>
   <div style="display: flex">
-    <div id="map"></div>
-  <div style="border-style: groove; margin-left: 7px;">    
+      <div id="map">
+        
+      </div>
+      
+  <div style="border-style: groove; margin-left: 7px;">
+      <div>
+        <div style="border-style: outset; margin-top: 15px; margin-bottom: 15px; padding: 5px;">
+          Detalji staze:
+          <div style="border-style: outset; margin-top: 15px; margin-bottom: 15px;">
+            <canvas id="myChart" style="width:100%;max-width:700px"></canvas>
+          </div>
+          <div id="trekName">
+            Naziv treka: 
+          </div> 
+        </div>
+      </div>
+      <div style="border-style: outset; margin-top: 15px; margin-bottom: 15px; padding: 5px;">
+        Unos gpx fajlova
+    <form enctype = "multipart/form-data" onsubmit="return false;" style="margin-top: 5px;" >
+      <input type="button" id="loadFileGpx" value="Odaberite fjal" onclick="document.getElementById('file').click();" />
+      <input type="file" style="display:none;" id="file" name="static_file"/>
+      <button id="upload-button" onclick="uploadFile(this.form)"> Zapamti fajl </button>
+    </form>
+    </div>	 
         <div style="border-style: outset; margin-top: 5px; margin-bottom: 5px;">
             <div style="padding: 5pt;">
               Visina vrhova:
@@ -52,33 +74,87 @@
             <button onclick="clearPeaksFilter()" style="margin-left: 15;">X</button>
             </div>
         </div>
-        <div style="border-style: outset; margin-top: 15px; margin-bottom: 15px; padding: 5px;">
-          Unos gpx fajlova
-			<form enctype = "multipart/form-data" onsubmit="return false;" style="margin-top: 5px;" >
-        <input type="button" id="loadFileGpx" value="Odaberite fjal" onclick="document.getElementById('file').click();" />
-        <input type="file" style="display:none;" id="file" name="static_file"/>
-				<button id="upload-button" onclick="uploadFile(this.form)"> Zapamti fajl </button>
-			</form>
-			</div>
-       <div style="border-style: outset; margin-top: 15px; margin-bottom: 15px; padding: 5px;">
-       Detalji staze:
-       <div style="border-style: outset; margin-top: 15px; margin-bottom: 15px;">
-       <canvas id="myChart" style="width:100%;max-width:700px"></canvas>
-       </div>
-       <div id="trekName">
-        Naziv treka: 
-       </div>
-       </div>
+       
+       
+       <div style="border-style: outset; margin-top: 15px; margin-bottom: 15px; padding: 5px;" >
+        <button onclick="findDistance()" style="width: 150px; margin-left: 5px;">Izmeri distancu</button>
+        <button onclick="disableDistance()" style="margin-left: 15;">X</button>
+        <div  style="margin-top: 5px; margin-bottom: 5px; padding: 5px;">
+          Duzina:
+          <label id="distance"></label>
+        </div>
       </div> 
+        <div style="border-style: groove">
+          <div style="padding: 5pt;">
+              <label for="start">Start datum:</label>
+              <input type="date" id="startDatum" name="trip-start"
+                  value="2010-01-01"
+                  min="2010-01-01" max="2023-03-01">
+          </div>
+          <div style="padding: 5pt;">
+              <label for="start">Kraj datum:</label>
+              <input type="date" id="krajDatum" name="trip-start"
+                  value="2023-03-01"
+                  min="2012-10-01" max="2023-03-01">
+          </div>
+          <div style="padding: 5pt;">
+              <button onclick="filterTrekDate()" style="width: 200px;">Filtriraj trekove po datumu</button>
+              <button onclick="clearTrekDate()" style="margin-left: 5px;">X</button>
+          </div>
+       </div>
+       <div id="rbDiv" style="border-style: outset; margin-top: 15px; margin-bottom: 15px; padding: 5px;">
+        <div style="border-style: outset; margin-top: 15px; margin-bottom: 15px; padding: 5px;">
+        Filtriraj trekove po regionima
+          <div style="margin-top: 5px">
+            <input type="radio" id="myRadio1" name="region" value="Војводина">
+            Vojvodina
+          </div>
+          <div>
+            <input type="radio" id="myRadio2" name="region" value="Јужна%20и%20источна%20Србија">
+            Juzna i istocna Srbija
+          </div>
+          <div>
+            <input type="radio" id="myRadio3" name="region" value="Шумадија и западна Србија">
+            Sumadija i zapadna Srbija 
+          </div>
+          <div style="margin-bottom: 5px;">
+            <input type="radio" id="myRadio4" name="region" value="Централна%20Србија">
+            Centralna Srbija
+          </div>
+          </div>
+          <div style="border-style: outset; margin-top: 15px; margin-bottom: 20px; padding: 5px;">
+            Najpopularnije planine
+            <div style="margin-bottom: 5px;">
+              <input type="radio" id="myRadio5" name="region" value="Национални%20парк%20Стара%20планина">
+              Stara planina
+            </div>
+            <div style="margin-bottom: 5px;">
+              <input type="radio" id="myRadio6" name="region" value="СРП%20Сува%20планина">
+              Suva planina
+            </div>
+            <div style="margin-bottom: 5px;">
+              <input type="radio" id="myRadio7" name="region" value="Национални%20парк%20Фрушка%20гора">
+              Fruska gora
+            </div>
+            <div style="margin-bottom: 5px;">
+              <input type="radio" id="myRadio8" name="region" value="Национални%20парк%20Копаоник">
+              Kopaonik
+            </div>
+          </div>
+
+
+          <button onclick="filterTreksRegion()" style="width: 150px; margin-left: 5px;">Filtriraj</button>
+          <button onclick="clearTrekRegion()" style="margin-left: 15;">X</button>
+        </div>
+      
 			
 			
  <div id="static_file_response"> </div>
-			
+
     </div>
+    
   </div>
-  <div>
-   
-  </div>
+  
   </div>
   <script src="hikingjs.js">
     
