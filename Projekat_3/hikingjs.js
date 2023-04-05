@@ -42,7 +42,8 @@
       line: 'gis_test:planet_osm_line_new',
 	    tracks:'gis_test:tracks',
 	    track_points:'gis_test:track_points',
-	    trek_start:'gis_test:start_point'
+	    trek_start:'gis_test:start_point',
+      created_tracks:'gis_test:created_tracks'
     }
 	
     var map = initMap();
@@ -52,12 +53,17 @@
 
     var isInsertMode = false;
     var calculateDistance=false;
+    var createTrack=false;
     var pointClickedEvent = null;
+    var previous=null;
     var polylines = [];
     var distancelines=[];
     var markers=[];
     var gDArray=[];
     var distancArray=[];
+    var createdTrack=[];
+    var createdTrackdistance=0;
+
     var posOnGraphMarker;
     var isLineShown=false;
     let ms;
@@ -81,6 +87,9 @@
     })
     createTracksNationalParks().then(a => {
       layerControls.addOverlay(voda, 'Staze u nacionalnim parkovima');
+    })
+    createWaterSourcesNearTracks().then(a=>{
+      layerControls.addOverlay(voda2,'Staze koje prolaze blizu izvora');
     })
     createTrekLayer().then(a => {
       layerControls.addOverlay(start, 'Trek');
@@ -110,6 +119,20 @@
         getFeatureInfo(e);
       }
 
+      if(createTrack){
+       addCurrLocMarker(e);
+       createdTrack.push(e.latlng);
+       console.log(createdTrack);
+       if(createdTrack.length>1){
+        r=distanceBetweenTrackPoints(createdTrack[createdTrack.length-1],createdTrack[createdTrack.length-2]);
+        createdTrackdistance+=r;
+        x=document.getElementById('distanceTrack');
+        x.innerHTML=createdTrackdistance;
+        console.log(createdTrack[createdTrack.length-1])
+        console.log(r);
+      }
+      }
+
       if(calculateDistance){
         pointClickedEvent = e;
         distancArray.push(e)
@@ -123,7 +146,6 @@
 
       if(distancArray.length>2){
         x=distancelines.pop();
-        console.log("aaaabbb");
         console.log(distancelines);
         map.removeLayer(x);
       }
@@ -157,7 +179,6 @@
     }
 
     function disableDistance(){
-      console.log("disable distance");
       calculateDistance=false;
       if(distancArray.length>1){
         b=distancArray.pop()
@@ -166,17 +187,110 @@
       }
     }
 
+    function enableTrackCreate(){
+      createTrack=true;
+    }
+
+    function disableTrackCreate(){
+      createTrack=false;
+    }
+
+    function clearCreatedTrack(){
+      console.log(distancelines.length)
+      for(i=0;i<distancelines.length;){
+        x=distancelines.pop();
+        map.removeLayer(x);
+      }
+      removeCurrMarker();
+      createdTrackdistance=0;
+      length=document.getElementById('distanceTrack');
+      length.innerHTML='';
+      a=document.getElementById('fname');
+      a.value='';
+      disableTrackCreate();
+      createdTrack=[];
+    }
+
+    function saveTrack(){
+      console.log(createdTrack);
+      //formGML(createdTrack);
+      var name=document.getElementById('fname').value;
+      sendData(createdTrack,name);
+    }
+
+    function sendData(lineArray,name){
+      line=formLineString(lineArray);
+      //line=line.substring(0, line.length - 1);
+      var postData =
+      '<wfs:Transaction\n'
+      + '  service="WFS"\n'
+      + '  version="1.1.0"\n'
+      + 'xmlns:gis_test ="http://localhost:8080/geoserver/gis_test"\n'
+      + `  xmlns:wfs="http://www.opengis.net/wfs"\n`
+      + `  xmlns:gml="http://www.opengis.net/gml"\n`
+      + `  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n`
+      + `   xsi:schemaLocation="http://www.opengis.net/wfs http://localhost:8080/geoserver/schemas/wfs/1.1.0/wfs.xsd\n`
+      + `                      http://localhost:8080/geoserver/gis_test/wfs/DescribeFeatureType?typename=gis_test:created_tracks">\n`
+      + '  <wfs:Insert>\n'
+      + '   <gis_test:created_tracks>\n'
+      + `   <gis_test:name>${name}</gis_test:name>\n`
+      + '   <gis_test:geom>\n'
+      + '       <gml:LineString  srsName="http://www.opengis.net/gml/srs/epsg.xml#4326">\n'
+      + '            <gml:coordinates xmlns:gml="http://www.opengis.net/gml" decimal="." cs="," ts=" ">' + line + '</gml:coordinates>\n'
+      + '        </gml:LineString >\n'
+      + '   </gis_test:geom>\n'
+      + '  </gis_test:created_tracks>\n'
+      + '  </wfs:Insert>\n'
+      + '</wfs:Transaction>';
+
+      var wfsUrl = `${serverBaseUrl}/wfs`;
+      console.log(postData);
+      $.ajax({
+        type: "POST",
+        url: wfsUrl,
+        dataType: "xml",
+        contentType: "text/xml",
+        data: postData,
+        //TODO: Error handling
+        success: function (xml) {
+          console.log(xml);
+          //TODO: User feedback
+          //console.log(type);
+          //populateAmenities(type);
+        }
+      });
+    }
+
+
+    function formLineString(dataArray){
+      var string=''
+      dataArray.forEach(point=>{
+        string+=point.lng+','+point.lat+' ';
+      })
+      //console.log(string);
+      return string
+    }
+
+    function distanceBetweenTrackPoints(pointA,pointB){
+      console.log('aaaaaaaaaaaaaaaaaaa');
+      drawLine(pointA,pointB);
+      x=getDistanceFromLatLonInKm(pointA.lat,pointA.lng,pointB.lat,pointB.lng);
+      x=Math.round(x*100)/100;
+      //var dist = document.getElementById('distanceTrack');
+      //dist.innerHTML=x+"km";
+      //console.log(x);
+      return x;
+    }
+
     function distanceBetweenPoints(){
       if(calculateDistance){
         var point1=distancArray[0].latlng;
         var point2=distancArray[1].latlng;
         drawLine(point1,point2);
         x=getDistanceFromLatLonInKm(point1.lat,point1.lng,point2.lat,point2.lng);
-        console.log(x);
         x=Math.round(x*100)/100;
         var dist = document.getElementById('distance');
         dist.innerHTML=x+"km";
-        console.log(distancArray);
       }
       
     }
@@ -184,14 +298,12 @@
     function drawLine(point1,point2){
       var pointlist=[point1,point2];
       //pointlist.forEach(swap);
-      console.log("drawLine");
       var line = new L.polyline(pointlist, {
         color: 'red',
         weight: 3,
         opacity: 0.5
     });
-    console.log(pointlist);
-    map.fitBounds(line.getBounds());
+    //map.fitBounds(line.getBounds());
     line.addTo(map);
     distancelines.push(line);
     }
@@ -256,6 +368,11 @@
           layers: layer.tracks,
           format: 'image/png',
           transparent: true
+        }),
+        KreiraniTrekovi: L.tileLayer.wms(serverBaseUrl + '/wms', {
+          layers: layer.created_tracks,
+          format: 'image/png',
+          transparent: true
         })
       };
       layerControls = L.control.layers({}, basemaps, { collapsed: true, autoZIndex: false }).addTo(map);
@@ -318,7 +435,6 @@
               });
            }
         });
-        console.log(tmp.features[0]);
       });
     }
 
@@ -339,11 +455,11 @@
 
     function createTrekLayer() {
       return new Promise((resolve, reject) => {
-        let url = `${serverBaseUrl}/wfs?service=wfs&version=1.1.0&request=GetFeature&typename=${layer.trek_start}&outputformat=json&CRS=EPSG:4326`;
+        let url = `${serverBaseUrl}/wfs?service=wfs&version=1.1.0&request=GetFeature&typename=${layer.tracks}&outputformat=json&CRS=EPSG:4326`;
         callApiAndSetLayer(url, null, function (data) {
           if (data && data.features) {
             var uni = data.features.map(feature =>
-              markTrek([feature.geometry.coordinates[1], feature.geometry.coordinates[0]], feature.properties.name)
+              markTrek([feature.geometry.coordinates[0][0][1], feature.geometry.coordinates[0][0][0]], feature.properties.name)
               
             );
             start = L.layerGroup(uni);
@@ -355,12 +471,10 @@
     
     
     function createPathLayer(e){
-      console.log(e.latlng);
       for(var i=0;i<markers.length;i++){
         if(markers[i][0]._latlng==e.latlng){
           var msg=markers[i][1];
           drawPath(msg)
-          console.log('aaaaaa' + msg);
         }
       } 
     }
@@ -371,7 +485,6 @@
         map.removeLayer(x);
       }
       return new Promise((resolve, reject) => {
-        console.log(ms);
         let url = `${serverBaseUrl}/wfs?service=wfs&version=1.1.0&request=GetFeature&typename=${layer.tracks}&outputformat=json&cql_filter=name='${msg}'&CRS=EPSG:4326`;
         var tmp=null;
         $.ajax({
@@ -387,13 +500,12 @@
         n=tmp.features[0].properties.name;
         pointList=tmp.features[0].geometry.coordinates[0];
         pointList.forEach(swap);
-        console.log(tmp.features);
         var firstpolyline = new L.polyline(pointList, {
             color: 'blue',
             weight: 4,
             opacity: 0.4
         });
-        map.fitBounds(firstpolyline.getBounds());
+        //map.fitBounds(firstpolyline.getBounds());
         firstpolyline.addTo(map);
         polylines.push(firstpolyline);
         createGraph(src);
@@ -450,12 +562,9 @@
     }
 
     function drawGraph(xV,yV){
-     
       var xValues =xV;
-    
       var yValues = yV;
       if(myChr!=null){
-        console.log("ggggg");
         myChr.destroy();
       }
       
@@ -472,12 +581,7 @@
         options: {
           legend: {display: false},
           onClick: (event, elements, chart) => {
-            console.log(elements[0]._index);
-            console.log(gDArray[elements[0]._index]);
-            console.log('aaaaa')
-
             if(posOnGraphMarker!=null){
-              console.log('bbbb')
               map.removeLayer(posOnGraphMarker);
             }
             let msg="Distance: "+ gDArray[elements[0]._index].x +"km"+ "\n"+"Elevation: "+ gDArray[elements[0]._index].y+"m";
@@ -555,24 +659,20 @@
        return new Promise((resolve, reject) => {
          let url;
          url = `${serverBaseUrl}/wfs?service=wfs&version=1.1.0&request=GetFeature&typename=${layer.point4326}&outputformat=json&cql_filter=natural='peak' and ele between '${valueFrom}' and '${valueTo}'&CRS=EPSG:4326`;
-         console.log(url);
          callApiAndSetLayer(url, null, function (data, latlng, tt) {
            if (data && data.features) {
-            console.log('x4');
              var uni = data.features.map(feature =>              
                markFeature([feature.geometry.coordinates[1], feature.geometry.coordinates[0]], feature.properties.name, tt)           
              );
              var flag = false;
              filtered_peaks = L.layerGroup(uni);
              if(flag == true){
-              //console.log('x6');
                map.eachLayer((layer) => {
                  if(layer['_latlng']!=undefined)
                  layer.remove();
                })
                filtered_peaks.addTo(map);
              }
-             console.log('x7');
              layerControls.addOverlay(filtered_peaks, 'Odabrani vrhovi');
              resolve(filtered_peaks);
            }
@@ -601,28 +701,24 @@
       }
       let url = `${serverBaseUrl}/wfs?service=wfs&version=1.1.0&request=GetFeature&typename=${layer.trek_start}&outputformat=json&cql_filter=WITHIN(geom,collectGeometries(queryCollection('gis_test:planet_osm_polygon_new','way','name=''${value}''')))&CRS=EPSG:4326`;
       filterRegion(url);
-      console.log(url);
     }
 
     function filterRegion(url){
       return new Promise((resolve, reject) => {
         callApiAndSetLayer(url, null, function (data, latlng, tt) {
           if (data && data.features) {
-          console.log('x4');
             var uni = data.features.map(feature =>              
               markTrek([feature.geometry.coordinates[1], feature.geometry.coordinates[0]],feature.properties.name)          
             );
             var flag = false;
             filtered_treks = L.layerGroup(uni);
             if(flag == true){
-            console.log('x6');
               map.eachLayer((layer) => {
                 if(layer['_latlng']!=undefined)
                 layer.remove();
               })
               filtered_treks.addTo(map);
             }
-            console.log('x7');
             layerControls.addOverlay(filtered_treks, 'Odabrani trekovi');
             resolve(filtered_treks);
           }
@@ -646,33 +742,26 @@
 
       var sDT = startDateTime.toISOString();
       var eDT = endDateTime.toISOString();
-      console.log(sDT);
-      console.log(eDT);
       let url = `${serverBaseUrl}/wfs?service=wfs&version=1.1.0&request=GetFeature&typename=${layer.trek_start}&outputformat=json&cql_filter=dtime%20AFTER%20${sDT}%20and%20dtime%20BEFORE%20${eDT}&CRS=EPSG:4326`;
-      console.log(url);
       createfilterDateLayer(url);
-      //let cityUrl = `${serverBaseUrl}/wfs?service=wfs&version=1.1.0&request=GetFeature&typename=${layer.trek_start}&outputformat=json&cql_filter=amenity in ('school', 'driving_school', 'language_school') AND dwithin(way, collectGeometries(queryCollection('serbia:planet_osm_datapoint', 'way', 'speed > 45 and speed < 220 and dtime AFTER ${sDT} and dtime BEFORE ${eDT}')), 200, meters)&CRS=EPSG:4326`;        
     }
 
     function createfilterDateLayer(url){
       return new Promise((resolve, reject) => {
         callApiAndSetLayer(url, null, function (data, latlng, tt) {
           if (data && data.features) {
-          console.log('x4');
             var uni = data.features.map(feature =>              
               markTrek([feature.geometry.coordinates[1], feature.geometry.coordinates[0]],feature.properties.name)          
             );
             var flag = false;
             filtered_treks_date = L.layerGroup(uni);
             if(flag == true){
-            console.log('x6');
               map.eachLayer((layer) => {
                 if(layer['_latlng']!=undefined)
                 layer.remove();
               })
               filtered_treks_date.addTo(map);
             }
-            console.log('x7');
             layerControls.addOverlay(filtered_treks_date, 'Odabrani trekovi');
             resolve(filtered_treks_date);
           }
@@ -688,12 +777,9 @@
 
     
      function createTracksNationalParks() {
-        return new Promise((resolve, reject) => {
-          console.log('aaaaaa');    
+        return new Promise((resolve, reject) => { 
           let url = `${serverBaseUrl}/wfs?service=wfs&version=1.1.0&request=GetFeature&typename=${layer.trek_start}&outputformat=json&cql_filter=WITHIN(geom,collectGeometries(queryCollection('gis_test:planet_osm_polygon_new','way','boundary=''national_park''')))&CRS=EPSG:4326`;//boundary in ('national_park', 'protected_area')
-          console.log(url);
           callApiAndSetLayer(url, null, function (data) {
-            console.log(data);
             if (data && data.features) {
               var w = data.features.map(feature =>
                 markTrek([feature.geometry.coordinates[1], feature.geometry.coordinates[0]],feature.properties.name)
@@ -702,6 +788,20 @@
               resolve();
             }
           }, 'voda')});
+      }
+
+      function createWaterSourcesNearTracks() {
+        return new Promise((resolve, reject) => {
+          let url = `${serverBaseUrl}/wfs?service=wfs&version=1.1.0&request=GetFeature&typename=${layer.tracks}&outputformat=json&cql_filter=DWITHIN(wkb_geometry,collectGeometries(queryCollection('gis_test:planet_osm_point_new','way','amenity=''drinking_water''')),10,meters)&CRS=EPSG:4326`;//amenity='drinking_water'%20OR%20waterway='source'%20OR%20natural='spring'%20AND%20
+          callApiAndSetLayer(url, null, function (data) {
+            if (data && data.features) {
+              var w = data.features.map(feature =>
+                markTrek([feature.geometry.coordinates[0][0][1], feature.geometry.coordinates[0][0][0]],feature.properties.name)
+              );
+              voda2 = L.layerGroup(w);
+              resolve();
+            }
+          }, 'voda2')});
       }
 
 
@@ -771,6 +871,8 @@
         ico = icons.start;
       }else if (type == 'park'){
         ico = icons.cave;  
+      }else if (type == 'voda2'){
+        ico = icons.start;  
       }else if (type == 'hut'){
         ico = icons.viewpoint;  
       }
