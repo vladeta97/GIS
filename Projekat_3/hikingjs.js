@@ -254,9 +254,6 @@
         //TODO: Error handling
         success: function (xml) {
           console.log(xml);
-          //TODO: User feedback
-          //console.log(type);
-          //populateAmenities(type);
         }
       });
     }
@@ -272,7 +269,6 @@
     }
 
     function distanceBetweenTrackPoints(pointA,pointB){
-      console.log('aaaaaaaaaaaaaaaaaaa');
       drawLine(pointA,pointB);
       x=getDistanceFromLatLonInKm(pointA.lat,pointA.lng,pointB.lat,pointB.lng);
       x=Math.round(x*100)/100;
